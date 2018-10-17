@@ -59,3 +59,9 @@ you need install all dependencies of libmrock first.
 	pot->checkAssurance(LYGameFlop, c2);
 	ASSERT_EQ(pot->chasingOuts.size(), 6+9);
 	game->onTurn(c2);
+
+# License
+This library is licensed under the Apache Public License 2.0 and two clause BSD license. Please read the included LICENSE file for details.
+
+# Patches
+Anybody can contribute to log4cplus development. If you are contributing a source code change, use a reasonable form: a merge request of a Git branch or a patch file attached to a ticket in Bugs tracker or sent email to me. Unless it is obvious, always state what branch or release tarball is your patch based upon.
