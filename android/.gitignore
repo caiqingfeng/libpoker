@@ -1,0 +1,13 @@
+/include/
+/lib/
+/common/src/
+/common/obj/
+/poker/src/
+/poker/obj/
+/poker/lib/
+/holdem/src/
+/holdem/obj/
+/holdem/lib/
+/client/src/
+/client/obj/
+/client/lib/

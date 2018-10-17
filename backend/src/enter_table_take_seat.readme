@@ -1,0 +1,44 @@
+20160701, 进入、离开桌子，坐下、起身座位的状态持久化：
+*** 注意，redis里用户手中的chips_at_hand存在两个地方：tables.id.players.id.chips_at_hand及tables.id.seats.id.chips_at_hand
+一局的状态变化，都放在Redis中，一局游戏的每个动作，涉及到的座位状态变化，Game状态的变化，都存在redis中
+一局结束时，每个座位的筹码变化，放到mysql中
+用户进入桌子时，从mysql中获取table user的信息，主要是buyin, chips_at_hand, 并存在redis中，返回客户端其在本桌的筹码。需要修改proto
+如果redis中已经有该用户的信息，直接返回chips_at_hand，
+用户离开桌子时，从redis中删除用户信息，不需要更新table_users记录
+用户坐下时，如果是新的buyin，则在table_users表中记录，并且登记到redis中
+用户离座时，保留redis记录，更新其table_users表中记录，
+服务器重启时，从redis中读取table, seats, games，以及timer相关信息
+
+以下是几种异常情况的处理：
+CASE 1: 用户玩一局，中途断线，此时table_users chips_at_hand = 1000, redis chips_at_hand = 800
+用户enter_table时，首先查redis是否有用户记录，如果有，并且用户是in_games的情况，未超时，会reply_scene给客户端，
+scene里有正确的chips_at_hand, timer，客户端可以正常响应。
+如果客户端已经超时，当fold处理，所有的fold动作，都会导致用户的chips_at_hand更新到table_users中，而所有的bet/call等
+减少chips_at_hand的动作，都会导致redis更新chips_at_hand
+
+CASE 2:用户正在游戏中，服务器重启
+此时服务器从redis中恢复所有games, seats, pots, timers等状态，不care mysql的数据
+假设正在polling seat1，还未超时（30s之内重启），根据lastPollingAt，重新注册一个polling timer，时间已经过了n seconds
+如果已经超时，则判seat1 timeout fold，此时正常往下走
+
+CASE 3：一局将要结束，服务器重启
+同CASE2
+
+CASE 4: 9人桌，4，8号在玩，1号进来，reply_scene to all ? wrong
+此时有3人在坐，不应该注册new_game_request timer
+
+同时离开了很多人，并且只有两个人有筹码时，此时导致注册多个new_game timer
+
+enterTable:
+
+1、 ServerHall->enterTable(table, player) 调用
+2、 ServerPlayerMgr->enterTable(table, player) 调用
+3a、 PokerPersistenceServiceMysql->load_user_from_db(player, LYPlayer& user);
+3b、 PokerPersistenceServiceRedis->save_user_to_db(user);
+
+TakeSeat:
+1、 ServerHall->takeSeat(table, player, seat, chips) 调用
+2、 chips2 = ServerHall->getUserChips(table, player, seat)
+if (chips2 > 0 && chips2 == chips) 说明是重入，
+3a、 PokerPersistenceServiceMysql->load_user_from_db(player, LYPlayer& user);
+3b、 PokerPersistenceServiceRedis->save_seat_to_db(user);
